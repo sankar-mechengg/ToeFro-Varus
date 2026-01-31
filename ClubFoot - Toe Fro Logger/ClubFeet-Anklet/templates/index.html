@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOE FRO - UDP Logger</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --background-dark: #121212;
+            --primary-surface: #1e1e1e;
+            --secondary-surface: #2a2a2a;
+            --neon-green: #39ff14;
+            --light-gray: #bbbbbb;
+            --border-color: #333333;
+            --font-family: 'Roboto Mono', monospace;
+        }
+
+        body {
+            font-family: var(--font-family);
+            margin: 0;
+            padding: 20px;
+            background-color: var(--background-dark);
+            color: var(--light-gray);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: var(--primary-surface);
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        h2 {
+            color: var(--neon-green);
+            text-align: center;
+            letter-spacing: 4px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+        }
+
+        .section {
+            background-color: var(--secondary-surface);
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .section-title {
+            color: white;
+            font-weight: bold;
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+        
+        .status-container { display: flex; justify-content: space-around; align-items: center; padding: 10px 0; }
+        .status-block { text-align: center; }
+
+        input[type="text"], button {
+            font-family: var(--font-family);
+            padding: 12px 15px;
+            margin: 5px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background-color: #1a1a1a;
+            color: var(--light-gray);
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--neon-green);
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
+        }
+
+        button {
+            cursor: pointer;
+            background-color: #333;
+            color: white;
+            border: 1px solid #555;
+            font-weight: bold;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: var(--neon-green);
+            color: #121212;
+            border-color: var(--neon-green);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            background-color: #222;
+            color: #555;
+            border-color: #333;
+        }
+
+        .status-indicator {
+            padding: 10px; border-radius: 6px; display: inline-block; color: white; font-weight: bold; width: 120px; text-align: center;
+            font-size: 0.9em;
+            letter-spacing: 1px;
+            transition: background-color 0.4s ease;
+        }
+        
+        .status-logging-on { background-color: #007bff; }
+        .status-logging-off { background-color: #444; }
+
+        .status-streaming { background-color: #28a745; box-shadow: 0 0 15px rgba(40, 167, 69, 0.6); }
+        .status-no-signal, .status-waiting { background-color: #ffc107; color: #1a1a1a !important; }
+        .status-disconnected { background-color: #dc3545; box-shadow: 0 0 15px rgba(220, 53, 69, 0.6); }
+
+        #folder-contents {
+            height: 150px; overflow-y: scroll; border: 1px solid var(--border-color); padding: 15px; background-color: #1a1a1a; border-radius: 6px;
+            color: #a0a0a0;
+        }
+        #folder-contents div { padding: 4px 0; }
+
+        .attribute-btn.active {
+            background-color: var(--neon-green);
+            color: #121212;
+            border-color: var(--neon-green);
+        }
+        
+        .action-box { display: flex; justify-content: center; gap: 20px; }
+        #startButton, #stopButton { flex-grow: 1; padding: 15px; font-size: 1.1em; }
+        
+        .input-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 15px; }
+        .input-group label { margin-left: 5px; font-size: 0.9em; color: white; }
+        .input-group div { display: flex; }
+        .input-group input { flex-grow: 1; margin: 0; }
+        .input-group button { margin: 0 0 0 10px; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>TOE FRO LOGGER</h2>
+
+        <div class="section">
+            <div class="status-container">
+                <div class="status-block">
+                    <div class="section-title">LOGGING STATUS</div>
+                    <span id="loggingStatus" class="status-indicator status-logging-off">OFF</span>
+                </div>
+                <div class="status-block">
+                    <div class="section-title">DEVICE CONNECTION</div>
+                    <span id="streamingStatus" class="status-indicator status-no-signal">NO SIGNAL</span>
+                </div>
+            </div>
+            <p id="status-message" style="text-align: center; min-height: 1.2em; font-size: 0.9em; color: var(--neon-green);"></p>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Configuration</div>
+            <div class="input-group">
+                <label for="folderPath">Save Folder Path</label>
+                <div>
+                    <input type="text" id="folderPath" value="{{ default_folder or '' }}" placeholder="Path is auto-detected on startup...">
+                    <button id="refreshFolderButton">Refresh</button>
+                </div>
+            </div>
+            <div class="input-group">
+                <label for="participantName">Participant Name</label>
+                <div>
+                    <input type="text" id="participantName" placeholder="Enter participant's name...">
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+             <div class="section-title">Select Attribute</div>
+             <div id="attribute-buttons-container" style="padding-bottom: 15px; border-bottom: 1px solid var(--border-color);">
+                <button class="attribute-btn" data-attr="FROG">FROG</button>
+                <button class="attribute-btn" data-attr="HEEL">HEEL</button>
+                <button class="attribute-btn" data-attr="KANGAROO">KANGAROO</button>
+                <button class="attribute-btn" data-attr="SCISSOR">SCISSOR</button>
+                <button class="attribute-btn" data-attr="SIDEKICK">SIDEKICK</button>
+                <button class="attribute-btn" data-attr="TIPTOE">TIPTOE</button>
+            </div>
+            <div class="input-group" style="margin-top: 15px; margin-bottom: 0;">
+                <div>
+                    <input type="text" id="customAttribute" placeholder="Add a custom attribute...">
+                    <button onclick="addCustomAttribute()">Add</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="action-box">
+            <button id="startButton">START LOGGING</button>
+            <button id="stopButton" disabled>STOP LOGGING</button>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Folder Contents</div>
+            <div id="folder-contents">Set a folder path to see its contents.</div>
+        </div>
+    </div>
+
+    <script>
+        // All JavaScript code remains the same as the previous version.
+        // It does not need any changes.
+        let selectedAttribute = null;
+
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const refreshFolderButton = document.getElementById('refreshFolderButton');
+        const loggingStatusEl = document.getElementById('loggingStatus');
+        const streamingStatusEl = document.getElementById('streamingStatus');
+        const statusMessageEl = document.getElementById('status-message');
+        const attributeButtonsContainer = document.getElementById('attribute-buttons-container');
+
+        refreshFolderButton.addEventListener('click', updateFolderContents);
+        attributeButtonsContainer.addEventListener('click', (event) => {
+            if (event.target.classList.contains('attribute-btn')) {
+                attributeButtonsContainer.querySelectorAll('.attribute-btn').forEach(btn => btn.classList.remove('active'));
+                event.target.classList.add('active');
+                selectedAttribute = event.target.dataset.attr;
+            }
+        });
+        startButton.addEventListener('click', startLogging);
+        stopButton.addEventListener('click', stopLogging);
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            updateFolderContents();
+            setInterval(checkStreamingStatus, 4000);
+        });
+
+        async function startLogging() {
+            const folderPath = document.getElementById('folderPath').value;
+            const participantName = document.getElementById('participantName').value;
+            if (!folderPath || !participantName || !selectedAttribute) {
+                alert('Please provide a folder path, participant name, and select an attribute.');
+                return;
+            }
+            const response = await fetch('/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folderPath, participantName, attribute: selectedAttribute })
+            });
+            const result = await response.json();
+            if (result.status === 'started') {
+                updateUiForLogging(true, `Logging to: ${result.filename}`);
+            } else {
+                alert('Error: ' + result.message);
+            }
+        }
+
+        async function stopLogging() {
+            const response = await fetch('/stop', { method: 'POST' });
+            const result = await response.json();
+            if (result.status === 'stopped' || result.status === 'not_logging') {
+                updateUiForLogging(false);
+            } else {
+                alert("Could not stop the logger.");
+            }
+        }
+
+        async function checkStreamingStatus() {
+            try {
+                const response = await fetch('/check_status', { cache: "no-cache" });
+                const data = await response.json();
+                updateStreamingStatus(data.status);
+            } catch (error) {
+                console.error("Status check failed:", error);
+                updateStreamingStatus('disconnected');
+            }
+        }
+        
+        function updateStreamingStatus(status) {
+            streamingStatusEl.className = 'status-indicator';
+            switch (status) {
+                case 'streaming':
+                    streamingStatusEl.classList.add('status-streaming');
+                    streamingStatusEl.textContent = 'STREAMING';
+                    break;
+                case 'no_signal':
+                    streamingStatusEl.classList.add('status-no-signal');
+                    streamingStatusEl.textContent = 'NO SIGNAL';
+                    break;
+                case 'disconnected':
+                    streamingStatusEl.classList.add('status-disconnected');
+                    streamingStatusEl.textContent = 'DISCONNECTED';
+                    break;
+            }
+        }
+        
+        function addCustomAttribute() {
+            const customAttrInput = document.getElementById('customAttribute');
+            const customAttrName = customAttrInput.value.trim().toUpperCase();
+            if (customAttrName && !document.querySelector(`[data-attr="${customAttrName}"]`)) {
+                const newButton = document.createElement('button');
+                newButton.className = 'attribute-btn';
+                newButton.dataset.attr = customAttrName;
+                newButton.textContent = customAttrName;
+                attributeButtonsContainer.appendChild(newButton);
+                customAttrInput.value = '';
+            }
+        }
+        
+        function updateUiForLogging(isLogging, message = '') {
+            loggingStatusEl.classList.toggle('status-logging-on', isLogging);
+            loggingStatusEl.classList.toggle('status-logging-off', !isLogging);
+            loggingStatusEl.textContent = isLogging ? 'ON' : 'OFF';
+            statusMessageEl.textContent = isLogging ? message : '';
+            
+            startButton.disabled = isLogging;
+            stopButton.disabled = !isLogging;
+            refreshFolderButton.disabled = isLogging;
+            
+            document.getElementById('folderPath').disabled = isLogging;
+            document.getElementById('participantName').disabled = isLogging;
+            document.querySelectorAll('.attribute-btn, #customAttribute, #customAttribute + button').forEach(el => el.disabled = isLogging);
+
+            if (!isLogging) {
+                attributeButtonsContainer.querySelectorAll('.attribute-btn').forEach(btn => btn.classList.remove('active'));
+                selectedAttribute = null;
+                updateFolderContents();
+            }
+        }
+
+        async function updateFolderContents() {
+            const folderPath = document.getElementById('folderPath').value;
+            const folderContentsDiv = document.getElementById('folder-contents');
+            if (!folderPath) {
+                folderContentsDiv.innerHTML = 'No folder selected.';
+                return;
+            };
+            try {
+                const response = await fetch('/get_folder_contents', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folderPath })
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    folderContentsDiv.innerHTML = data.contents.map(item => `<div>- ${item}</div>`).join('') || 'Folder is empty.';
+                } else {
+                    folderContentsDiv.innerHTML = 'Error: Path not found or invalid.';
+                }
+            } catch(e) {
+                folderContentsDiv.innerHTML = 'Error communicating with server.';
+            }
+        }
+        
+        setInterval(() => {
+            if (!startButton.disabled) {
+                const folderPath = document.getElementById('folderPath').value;
+                if (folderPath) updateFolderContents();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
